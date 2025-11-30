@@ -245,3 +245,20 @@ uv run uvicorn main:app --reload --port 3000
 ```
 
 Changes to `main.py` or `models.py` will automatically restart the server.
+
+## Seeding Database with Fake Data
+
+To populate the database with 100 fake todo records for testing:
+
+```bash
+uv run python seed_data.py
+```
+
+This script will:
+- Generate 100 realistic todo items
+- Use tags: `personal`, `groceries`, `course`, `work`
+- Create due dates anchored to today (ranging from 30 days past to 30 days future)
+- Randomly mark ~20% as completed
+- Display statistics after insertion
+
+The fake data includes realistic task descriptions appropriate to each tag category and helps test filtering, sorting, and pagination features.
