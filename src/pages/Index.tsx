@@ -1,34 +1,50 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { TodoItem, type Todo } from "@/components/TodoItem";
-import { Plus, CheckCircle2 } from "lucide-react";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { TodoItem } from "@/components/TodoItem";
+import { Todo } from "@/types/todo";
+import { Plus, CheckCircle2, CalendarIcon, X } from "lucide-react";
 import { toast } from "sonner";
+import { todoService } from "@/services/todoService";
+import { format } from "date-fns";
+import { cn } from "@/lib/utils";
 
 const Index = () => {
   const [todos, setTodos] = useState<Todo[]>([]);
   const [inputValue, setInputValue] = useState("");
+  const [dueDate, setDueDate] = useState<Date | undefined>();
+  const [tagInput, setTagInput] = useState("");
+  const [tags, setTags] = useState<string[]>([]);
 
-  const handleAddTodo = (e: React.FormEvent) => {
+  useEffect(() => {
+    loadTodos();
+  }, []);
+
+  const loadTodos = async () => {
+    const allTodos = await todoService.getAllTodos();
+    setTodos(allTodos);
+  };
+
+  const handleAddTodo = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!inputValue.trim()) {
       toast.error("Please enter a task");
       return;
     }
 
-    const newTodo: Todo = {
-      id: Date.now().toString(),
-      text: inputValue.trim(),
-      completed: false,
-    };
-
+    const newTodo = await todoService.createTodo(inputValue.trim(), dueDate, tags);
     setTodos([newTodo, ...todos]);
     setInputValue("");
+    setDueDate(undefined);
+    setTags([]);
     toast.success("Task added!");
   };
 
-  const handleToggleTodo = (id: string) => {
+  const handleToggleTodo = async (id: string) => {
+    await todoService.toggleTodo(id);
     setTodos(
       todos.map((todo) =>
         todo.id === id ? { ...todo, completed: !todo.completed } : todo
@@ -36,9 +52,31 @@ const Index = () => {
     );
   };
 
-  const handleDeleteTodo = (id: string) => {
+  const handleDeleteTodo = async (id: string) => {
+    await todoService.deleteTodo(id);
     setTodos(todos.filter((todo) => todo.id !== id));
     toast.success("Task deleted");
+  };
+
+  const handleUpdateTodo = async (id: string, updates: Partial<Omit<Todo, 'id'>>) => {
+    await todoService.updateTodo(id, updates);
+    setTodos(
+      todos.map((todo) =>
+        todo.id === id ? { ...todo, ...updates } : todo
+      )
+    );
+    toast.success("Task updated!");
+  };
+
+  const handleAddTag = () => {
+    if (tagInput.trim() && !tags.includes(tagInput.trim())) {
+      setTags([...tags, tagInput.trim()]);
+      setTagInput("");
+    }
+  };
+
+  const handleRemoveTag = (tagToRemove: string) => {
+    setTags(tags.filter(tag => tag !== tagToRemove));
   };
 
   const completedCount = todos.filter((todo) => todo.completed).length;
@@ -71,7 +109,7 @@ const Index = () => {
           )}
         </div>
 
-        <form onSubmit={handleAddTodo} className="mb-8">
+        <form onSubmit={handleAddTodo} className="mb-8 space-y-3">
           <div className="flex gap-2">
             <Input
               value={inputValue}
@@ -84,6 +122,75 @@ const Index = () => {
               Add
             </Button>
           </div>
+          
+          <div className="flex flex-wrap gap-2">
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className={cn(
+                    "gap-2",
+                    dueDate && "bg-secondary"
+                  )}
+                >
+                  <CalendarIcon className="h-4 w-4" />
+                  {dueDate ? format(dueDate, "MMM d") : "Due date"}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar
+                  mode="single"
+                  selected={dueDate}
+                  onSelect={setDueDate}
+                  initialFocus
+                  className="pointer-events-auto"
+                />
+              </PopoverContent>
+            </Popover>
+
+            {dueDate && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setDueDate(undefined)}
+              >
+                Clear date
+              </Button>
+            )}
+
+            <div className="flex gap-2 items-center">
+              <Input
+                value={tagInput}
+                onChange={(e) => setTagInput(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), handleAddTag())}
+                placeholder="Add tag"
+                className="h-9 w-32"
+              />
+              <Button type="button" size="sm" onClick={handleAddTag}>
+                Add Tag
+              </Button>
+            </div>
+          </div>
+
+          {tags.length > 0 && (
+            <div className="flex flex-wrap gap-2">
+              {tags.map((tag) => (
+                <span
+                  key={tag}
+                  className="inline-flex items-center gap-1 px-2 py-1 bg-accent text-accent-foreground rounded-full text-xs"
+                >
+                  {tag}
+                  <button
+                    onClick={() => handleRemoveTag(tag)}
+                    className="hover:text-destructive"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </span>
+              ))}
+            </div>
+          )}
         </form>
 
         <div className="space-y-2">
@@ -110,6 +217,7 @@ const Index = () => {
                   todo={todo}
                   onToggle={handleToggleTodo}
                   onDelete={handleDeleteTodo}
+                  onUpdate={handleUpdateTodo}
                 />
               ))
             )}
