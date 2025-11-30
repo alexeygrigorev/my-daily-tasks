@@ -1,73 +1,139 @@
-# Welcome to your Lovable project
+# My Daily Tasks
 
-## Project info
+A full-stack task management application with a React + Vite frontend and FastAPI backend.
 
-**URL**: https://lovable.dev/projects/0fb24526-e047-4faa-8cd9-de98b83eb1c2
+## Project Structure
 
-## How can I edit this code?
+```
+my-daily-tasks/
+├── client/          # React + Vite frontend
+├── server/          # FastAPI backend
+└── openapi.yaml     # API specification
+```
 
-There are several ways of editing your application.
+## Getting Started
 
-**Use Lovable**
+### Prerequisites
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/0fb24526-e047-4faa-8cd9-de98b83eb1c2) and start prompting.
+- **Frontend**: Node.js 18+ and npm
+- **Backend**: Python 3.13+ and [uv](https://github.com/astral-sh/uv)
 
-Changes made via Lovable will be committed automatically to this repo.
+### Running the Application
 
-**Use your preferred IDE**
+#### 1. Start the Backend Server
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+```bash
+cd server
+uv run uvicorn main:app --reload --port 3000
+```
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+The API will be available at `http://localhost:3000`
+- Swagger UI: http://localhost:3000/docs
+- Health check: http://localhost:3000/health
 
-Follow these steps:
+#### 2. Start the Frontend Client
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+In a new terminal:
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
+```bash
+cd client
+npm install   # First time only
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
+The app will be available at `http://localhost:5173`
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+### Running Tests
 
-**Use GitHub Codespaces**
+#### Backend Tests
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+```bash
+cd server
+uv run pytest test_api.py -v
+```
 
-## What technologies are used for this project?
+All 27 integration tests should pass.
 
-This project is built with:
+## Features
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+✅ **CRUD Operations**: Create, read, update, and delete todos  
+✅ **Filtering**: Filter todos by due date and tags  
+✅ **Modern UI**: Built with React, TypeScript, and Vite  
+✅ **Type-Safe**: Full TypeScript support  
+✅ **API Documentation**: Auto-generated with FastAPI  
+✅ **Tested**: Comprehensive integration test suite  
 
-## How can I deploy this project?
+## Configuration
 
-Simply open [Lovable](https://lovable.dev/projects/0fb24526-e047-4faa-8cd9-de98b83eb1c2) and click on Share -> Publish.
+### Frontend Environment Variables
 
-## Can I connect a custom domain to my Lovable project?
+Create `client/.env` to customize:
 
-Yes, you can!
+```env
+VITE_API_URL=http://localhost:3000
+```
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+### Backend Configuration
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+The backend runs on port 3000 by default. To change:
+
+```bash
+uv run uvicorn main:app --port 8000
+```
+
+Don't forget to update `VITE_API_URL` in the frontend if you change the port.
+
+## API Endpoints
+
+- `GET /api/todos` - Get all todos (supports `dueBefore` and `tags` filters)
+- `POST /api/todos` - Create a new todo
+- `PATCH /api/todos/{id}` - Update a todo
+- `DELETE /api/todos/{id}` - Delete a todo
+- `POST /api/todos/{id}/toggle` - Toggle completion status
+
+See [openapi.yaml](openapi.yaml) for the complete API specification.
+
+## Development
+
+### Frontend
+
+```bash
+cd client
+npm run dev      # Start dev server
+npm run build    # Build for production
+npm run preview  # Preview production build
+```
+
+### Backend
+
+```bash
+cd server
+uv run uvicorn main:app --reload  # Development with hot reload
+uv run pytest test_api.py         # Run tests
+```
+
+## Architecture
+
+- **Frontend**: React 18 + TypeScript + Vite
+- **Backend**: FastAPI + Pydantic + Python 3.13
+- **Data Storage**: In-memory (easily replaceable with database)
+- **API Design**: RESTful, following OpenAPI 3.0 spec
+
+## Next Steps
+
+- [ ] Add authentication
+- [ ] Add database persistence (PostgreSQL/SQLite)
+- [ ] Add more filtering options
+- [ ] Deploy to production
+- [ ] Add user accounts and multi-user support
+
+## Documentation
+
+- [Frontend README](client/README.md)
+- [Backend README](server/README.md)
+- [OpenAPI Specification](openapi.yaml)
+- [API Guide](.gemini/antigravity/brain/.../openapi-guide.md)
+
+## License
+
+MIT

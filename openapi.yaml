@@ -1,0 +1,469 @@
+openapi: 3.0.3
+info:
+  title: My Daily Tasks API
+  description: |
+    RESTful API for managing daily tasks with support for creating, updating, 
+    deleting, and retrieving todos. Each todo can have text, completion status, 
+    due dates, and tags.
+  version: 1.0.0
+  contact:
+    name: API Support
+servers:
+  - url: http://localhost:3000/api
+    description: Development server
+  - url: https://api.my-daily-tasks.com
+    description: Production server
+
+paths:
+  /todos:
+    get:
+      summary: Get all todos
+      description: |
+        Retrieves a list of todos for the user. Supports filtering by due date and tags.
+        
+        **Filtering behavior:**
+        - `dueBefore`: Returns todos with `dueDate <= dueBefore` (inclusive). Also includes todos without a due date.
+        - `tags`: Returns todos that have ALL specified tags (AND operation). Case-sensitive matching.
+        - When both filters are provided, todos must match BOTH criteria.
+      operationId: getAllTodos
+      tags:
+        - Todos
+      parameters:
+        - name: dueBefore
+          in: query
+          required: false
+          description: |
+            Filter todos with due date on or before this date (inclusive).
+            Returns todos where `dueDate <= dueBefore`.
+            Todos without a due date are also included.
+            Format: ISO 8601 date-time string.
+          schema:
+            type: string
+            format: date-time
+          examples:
+            today:
+              summary: Get todos due today
+              value: "2025-11-30T23:59:59.999Z"
+            nextWeek:
+              summary: Get todos due within next week
+              value: "2025-12-07T23:59:59.999Z"
+        - name: tags
+          in: query
+          required: false
+          description: |
+            Filter todos by tags. Comma-separated list of tags.
+            Returns todos that have ALL specified tags (AND operation).
+            Tags are case-sensitive.
+          schema:
+            type: string
+          examples:
+            single:
+              summary: Filter by single tag
+              value: "work"
+            multiple:
+              summary: Filter by multiple tags
+              value: "work,urgent"
+      responses:
+        '200':
+          description: Successful response with list of todos
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Todo'
+              examples:
+                emptyList:
+                  summary: Empty todo list
+                  value: []
+                allTodos:
+                  summary: All todos (no filters)
+                  value:
+                    - id: "1701234567890"
+                      text: "Complete project documentation"
+                      completed: false
+                      dueDate: "2025-12-01T00:00:00.000Z"
+                      tags: ["work", "documentation"]
+                      createdAt: "2025-11-30T10:00:00.000Z"
+                    - id: "1701234567891"
+                      text: "Buy groceries"
+                      completed: true
+                      tags: ["personal"]
+                      createdAt: "2025-11-29T15:30:00.000Z"
+                    - id: "1701234567892"
+                      text: "Review pull request"
+                      completed: false
+                      dueDate: "2025-11-30T17:00:00.000Z"
+                      tags: ["work", "urgent"]
+                      createdAt: "2025-11-30T09:00:00.000Z"
+                filteredByDueDate:
+                  summary: Filtered by due date (dueBefore=2025-11-30T23:59:59Z)
+                  value:
+                    - id: "1701234567892"
+                      text: "Review pull request"
+                      completed: false
+                      dueDate: "2025-11-30T17:00:00.000Z"
+                      tags: ["work", "urgent"]
+                      createdAt: "2025-11-30T09:00:00.000Z"
+                    - id: "1701234567891"
+                      text: "Buy groceries"
+                      completed: true
+                      tags: ["personal"]
+                      createdAt: "2025-11-29T15:30:00.000Z"
+                filteredByTags:
+                  summary: Filtered by tags (tags=work)
+                  value:
+                    - id: "1701234567890"
+                      text: "Complete project documentation"
+                      completed: false
+                      dueDate: "2025-12-01T00:00:00.000Z"
+                      tags: ["work", "documentation"]
+                      createdAt: "2025-11-30T10:00:00.000Z"
+                    - id: "1701234567892"
+                      text: "Review pull request"
+                      completed: false
+                      dueDate: "2025-11-30T17:00:00.000Z"
+                      tags: ["work", "urgent"]
+                      createdAt: "2025-11-30T09:00:00.000Z"
+                filteredByMultipleTags:
+                  summary: Filtered by multiple tags (tags=work,urgent)
+                  value:
+                    - id: "1701234567892"
+                      text: "Review pull request"
+                      completed: false
+                      dueDate: "2025-11-30T17:00:00.000Z"
+                      tags: ["work", "urgent"]
+                      createdAt: "2025-11-30T09:00:00.000Z"
+                filteredByCombination:
+                  summary: Filtered by due date AND tags (dueBefore=2025-12-05&tags=work)
+                  value:
+                    - id: "1701234567890"
+                      text: "Complete project documentation"
+                      completed: false
+                      dueDate: "2025-12-01T00:00:00.000Z"
+                      tags: ["work", "documentation"]
+                      createdAt: "2025-11-30T10:00:00.000Z"
+                    - id: "1701234567892"
+                      text: "Review pull request"
+                      completed: false
+                      dueDate: "2025-11-30T17:00:00.000Z"
+                      tags: ["work", "urgent"]
+                      createdAt: "2025-11-30T09:00:00.000Z"
+        '400':
+          description: Invalid query parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: "VALIDATION_ERROR"
+                message: "Invalid query parameters"
+                details:
+                  field: "dueBefore"
+                  reason: "Invalid date format. Expected ISO 8601 format."
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+    post:
+      summary: Create a new todo
+      description: Creates a new todo item with the provided details
+      operationId: createTodo
+      tags:
+        - Todos
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateTodoRequest'
+            examples:
+              simple:
+                summary: Simple todo
+                value:
+                  text: "Read a book"
+              withDetails:
+                summary: Todo with all details
+                value:
+                  text: "Finish quarterly report"
+                  dueDate: "2025-12-15T23:59:59.000Z"
+                  tags: ["work", "urgent"]
+      responses:
+        '201':
+          description: Todo created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Todo'
+              example:
+                id: "1701234567892"
+                text: "Finish quarterly report"
+                completed: false
+                dueDate: "2025-12-15T23:59:59.000Z"
+                tags: ["work", "urgent"]
+                createdAt: "2025-11-30T11:56:00.000Z"
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /todos/{id}:
+    parameters:
+      - $ref: '#/components/parameters/TodoId'
+
+    patch:
+      summary: Update a todo
+      description: Updates specific fields of an existing todo
+      operationId: updateTodo
+      tags:
+        - Todos
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateTodoRequest'
+            examples:
+              markCompleted:
+                summary: Mark as completed
+                value:
+                  completed: true
+              updateText:
+                summary: Update text and tags
+                value:
+                  text: "Updated task description"
+                  tags: ["updated", "modified"]
+              updateDueDate:
+                summary: Update due date
+                value:
+                  dueDate: "2025-12-31T23:59:59.000Z"
+      responses:
+        '200':
+          description: Todo updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Todo'
+              example:
+                id: "1701234567890"
+                text: "Complete project documentation"
+                completed: true
+                dueDate: "2025-12-01T00:00:00.000Z"
+                tags: ["work", "documentation"]
+                createdAt: "2025-11-30T10:00:00.000Z"
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+    delete:
+      summary: Delete a todo
+      description: Permanently deletes a todo item
+      operationId: deleteTodo
+      tags:
+        - Todos
+      responses:
+        '204':
+          description: Todo deleted successfully
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /todos/{id}/toggle:
+    parameters:
+      - $ref: '#/components/parameters/TodoId'
+
+    post:
+      summary: Toggle todo completion status
+      description: Toggles the completed status of a todo (convenience endpoint)
+      operationId: toggleTodo
+      tags:
+        - Todos
+      responses:
+        '200':
+          description: Todo toggled successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Todo'
+              example:
+                id: "1701234567890"
+                text: "Complete project documentation"
+                completed: true
+                dueDate: "2025-12-01T00:00:00.000Z"
+                tags: ["work", "documentation"]
+                createdAt: "2025-11-30T10:00:00.000Z"
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+components:
+  schemas:
+    Todo:
+      type: object
+      required:
+        - id
+        - text
+        - completed
+        - tags
+        - createdAt
+      properties:
+        id:
+          type: string
+          description: Unique identifier for the todo
+          example: "1701234567890"
+        text:
+          type: string
+          description: The todo item text/description
+          minLength: 1
+          maxLength: 500
+          example: "Complete project documentation"
+        completed:
+          type: boolean
+          description: Whether the todo is completed
+          example: false
+        dueDate:
+          type: string
+          format: date-time
+          description: Optional due date for the todo
+          example: "2025-12-01T00:00:00.000Z"
+          nullable: true
+        tags:
+          type: array
+          description: Tags/labels associated with the todo
+          items:
+            type: string
+            minLength: 1
+            maxLength: 50
+          example: ["work", "documentation"]
+        createdAt:
+          type: string
+          format: date-time
+          description: Timestamp when the todo was created
+          example: "2025-11-30T10:00:00.000Z"
+
+    CreateTodoRequest:
+      type: object
+      required:
+        - text
+      properties:
+        text:
+          type: string
+          description: The todo item text/description
+          minLength: 1
+          maxLength: 500
+          example: "Complete project documentation"
+        dueDate:
+          type: string
+          format: date-time
+          description: Optional due date for the todo
+          example: "2025-12-01T00:00:00.000Z"
+          nullable: true
+        tags:
+          type: array
+          description: Tags/labels to associate with the todo
+          items:
+            type: string
+            minLength: 1
+            maxLength: 50
+          example: ["work", "documentation"]
+          default: []
+
+    UpdateTodoRequest:
+      type: object
+      properties:
+        text:
+          type: string
+          description: Updated todo text/description
+          minLength: 1
+          maxLength: 500
+          example: "Updated task description"
+        completed:
+          type: boolean
+          description: Updated completion status
+          example: true
+        dueDate:
+          type: string
+          format: date-time
+          description: Updated due date
+          example: "2025-12-01T00:00:00.000Z"
+          nullable: true
+        tags:
+          type: array
+          description: Updated tags/labels
+          items:
+            type: string
+            minLength: 1
+            maxLength: 50
+          example: ["work", "updated"]
+      minProperties: 1
+
+    Error:
+      type: object
+      required:
+        - error
+        - message
+      properties:
+        error:
+          type: string
+          description: Error type/code
+          example: "NOT_FOUND"
+        message:
+          type: string
+          description: Human-readable error message
+          example: "Todo not found"
+        details:
+          type: object
+          description: Additional error details
+          additionalProperties: true
+
+  parameters:
+    TodoId:
+      name: id
+      in: path
+      required: true
+      description: Unique identifier of the todo
+      schema:
+        type: string
+      example: "1701234567890"
+
+  responses:
+    NotFound:
+      description: Todo not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: "NOT_FOUND"
+            message: "Todo not found"
+
+    BadRequest:
+      description: Invalid request parameters
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: "VALIDATION_ERROR"
+            message: "Invalid request parameters"
+            details:
+              field: "text"
+              reason: "Text is required and cannot be empty"
+
+    InternalServerError:
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: "INTERNAL_SERVER_ERROR"
+            message: "An unexpected error occurred"
+
+tags:
+  - name: Todos
+    description: Operations related to todo items
