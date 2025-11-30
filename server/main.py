@@ -1,12 +1,17 @@
 from datetime import datetime
 from typing import Optional
-from fastapi import FastAPI, HTTPException, Query, status
+from fastapi import FastAPI, HTTPException, Query, status, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from sqlalchemy.orm import Session
 from dateutil import parser
 import time
 
-from models import Todo, CreateTodoRequest, UpdateTodoRequest, ErrorResponse
+from database import engine, Base, get_db
+from models import Todo, CreateTodoRequest, UpdateTodoRequest, ErrorResponse, DBTodo
+
+# Create database tables
+Base.metadata.create_all(bind=engine)
 
 app = FastAPI(
     title="My Daily Tasks API",
@@ -30,16 +35,13 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# In-memory data store
-todos_db: dict[str, Todo] = {}
-id_counter = 0
-
 
 def generate_id() -> str:
     """Generate a unique ID for a new todo."""
-    global id_counter
-    id_counter += 1
-    return f"{int(time.time() * 1000)}{id_counter}"
+    # Simple timestamp-based ID generation
+    # In a real app, UUIDs or DB auto-incrementing IDs might be better
+    # But we want to keep the ID format consistent with the previous implementation
+    return f"{int(time.time() * 1000)}"
 
 
 @app.get("/api/todos", response_model=list[Todo])
@@ -50,6 +52,7 @@ async def get_todos(
     tags: Optional[str] = Query(
         None, description="Comma-separated list of tags to filter by"
     ),
+    db: Session = Depends(get_db),
 ) -> list[Todo]:
     """
     Get all todos with optional filtering.
@@ -57,17 +60,16 @@ async def get_todos(
     - **dueBefore**: Returns todos where dueDate <= dueBefore (inclusive). Also includes todos without a due date.
     - **tags**: Returns todos that have ALL specified tags (AND operation). Case-sensitive.
     """
-    result = list(todos_db.values())
+    query = db.query(DBTodo)
 
     # Filter by due date
     if dueBefore:
         try:
             due_before_dt = parser.isoparse(dueBefore)
-            result = [
-                todo
-                for todo in result
-                if todo.dueDate is None or todo.dueDate <= due_before_dt
-            ]
+            # Filter: dueDate is NULL OR dueDate <= due_before_dt
+            query = query.filter(
+                (DBTodo.dueDate.is_(None)) | (DBTodo.dueDate <= due_before_dt)
+            )
         except (ValueError, parser.ParserError) as e:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -81,21 +83,27 @@ async def get_todos(
                 },
             )
 
+    # Execute query to get results for tag filtering in Python
+    # (JSON filtering in SQLite can be tricky depending on version/extensions)
+    todos = query.all()
+
     # Filter by tags (AND operation - todo must have all specified tags)
     if tags:
         tag_list = [tag.strip() for tag in tags.split(",") if tag.strip()]
-        result = [todo for todo in result if all(tag in todo.tags for tag in tag_list)]
+        todos = [todo for todo in todos if all(tag in todo.tags for tag in tag_list)]
 
     # Sort by createdAt descending (newest first)
-    result.sort(key=lambda x: x.createdAt, reverse=True)
+    todos.sort(key=lambda x: x.createdAt, reverse=True)
 
-    return result
+    return todos
 
 
 @app.post("/api/todos", response_model=Todo, status_code=status.HTTP_201_CREATED)
-async def create_todo(request: CreateTodoRequest) -> Todo:
+async def create_todo(
+    request: CreateTodoRequest, db: Session = Depends(get_db)
+) -> Todo:
     """Create a new todo item."""
-    new_todo = Todo(
+    new_todo = DBTodo(
         id=generate_id(),
         text=request.text,
         completed=False,
@@ -104,20 +112,24 @@ async def create_todo(request: CreateTodoRequest) -> Todo:
         createdAt=datetime.now(),
     )
 
-    todos_db[new_todo.id] = new_todo
+    db.add(new_todo)
+    db.commit()
+    db.refresh(new_todo)
     return new_todo
 
 
 @app.patch("/api/todos/{id}", response_model=Todo)
-async def update_todo(id: str, request: UpdateTodoRequest) -> Todo:
+async def update_todo(
+    id: str, request: UpdateTodoRequest, db: Session = Depends(get_db)
+) -> Todo:
     """Update an existing todo."""
-    if id not in todos_db:
+    todo = db.query(DBTodo).filter(DBTodo.id == id).first()
+
+    if not todo:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail={"error": "NOT_FOUND", "message": "Todo not found"},
         )
-
-    todo = todos_db[id]
 
     # Update only the fields that are provided
     update_data = request.model_dump(exclude_unset=True)
@@ -135,33 +147,41 @@ async def update_todo(id: str, request: UpdateTodoRequest) -> Todo:
     for field, value in update_data.items():
         setattr(todo, field, value)
 
+    db.commit()
+    db.refresh(todo)
     return todo
 
 
 @app.delete("/api/todos/{id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_todo(id: str):
+async def delete_todo(id: str, db: Session = Depends(get_db)):
     """Delete a todo item."""
-    if id not in todos_db:
+    todo = db.query(DBTodo).filter(DBTodo.id == id).first()
+
+    if not todo:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail={"error": "NOT_FOUND", "message": "Todo not found"},
         )
 
-    del todos_db[id]
+    db.delete(todo)
+    db.commit()
     return None
 
 
 @app.post("/api/todos/{id}/toggle", response_model=Todo)
-async def toggle_todo(id: str) -> Todo:
+async def toggle_todo(id: str, db: Session = Depends(get_db)) -> Todo:
     """Toggle the completion status of a todo."""
-    if id not in todos_db:
+    todo = db.query(DBTodo).filter(DBTodo.id == id).first()
+
+    if not todo:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail={"error": "NOT_FOUND", "message": "Todo not found"},
         )
 
-    todo = todos_db[id]
     todo.completed = not todo.completed
+    db.commit()
+    db.refresh(todo)
 
     return todo
 
@@ -179,9 +199,10 @@ async def http_exception_handler(request, exc: HTTPException):
 
 # Health check endpoint
 @app.get("/health")
-async def health_check():
+async def health_check(db: Session = Depends(get_db)):
     """Health check endpoint."""
-    return {"status": "ok", "todos_count": len(todos_db)}
+    count = db.query(DBTodo).count()
+    return {"status": "ok", "todos_count": count}
 
 
 if __name__ == "__main__":

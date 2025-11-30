@@ -1,0 +1,16 @@
+{
+    "name": "my-daily-tasks",
+    "version": "1.0.0",
+    "description": "My Daily Tasks Application",
+    "scripts": {
+        "dev": "concurrently \"npm:dev:server\" \"npm:dev:client\"",
+        "dev:server": "cd server && uv run uvicorn main:app --reload --port 3000",
+        "dev:client": "cd client && npm run dev"
+    },
+    "keywords": [],
+    "author": "",
+    "license": "MIT",
+    "devDependencies": {
+        "concurrently": "^9.1.0"
+    }
+}

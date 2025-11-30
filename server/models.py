@@ -1,6 +1,21 @@
 from datetime import datetime
 from typing import Optional
 from pydantic import BaseModel, Field, ConfigDict
+from sqlalchemy import Column, String, Boolean, DateTime, JSON
+from database import Base
+
+
+class DBTodo(Base):
+    """SQLAlchemy ORM model for Todo."""
+
+    __tablename__ = "todos"
+
+    id = Column(String, primary_key=True, index=True)
+    text = Column(String, nullable=False)
+    completed = Column(Boolean, default=False)
+    dueDate = Column(DateTime, nullable=True)
+    tags = Column(JSON, default=list)
+    createdAt = Column(DateTime, default=datetime.now)
 
 
 class Todo(BaseModel):
@@ -8,7 +23,8 @@ class Todo(BaseModel):
 
     model_config = ConfigDict(
         # Allow datetime to be serialized as ISO 8601 strings
-        json_encoders={datetime: lambda v: v.isoformat()}
+        json_encoders={datetime: lambda v: v.isoformat()},
+        from_attributes=True,  # Enable ORM mode
     )
 
     id: str

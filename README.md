@@ -20,6 +20,18 @@ my-daily-tasks/
 
 ### Running the Application
 
+You can run both the frontend and backend with a single command from the root directory:
+
+```bash
+npm run dev
+```
+
+This will start:
+- Backend at `http://localhost:3000`
+- Frontend at `http://localhost:5173` (or next available port)
+
+Alternatively, you can run them separately:
+
 #### 1. Start the Backend Server
 
 ```bash
@@ -27,21 +39,12 @@ cd server
 uv run uvicorn main:app --reload --port 3000
 ```
 
-The API will be available at `http://localhost:3000`
-- Swagger UI: http://localhost:3000/docs
-- Health check: http://localhost:3000/health
-
 #### 2. Start the Frontend Client
-
-In a new terminal:
 
 ```bash
 cd client
-npm install   # First time only
 npm run dev
 ```
-
-The app will be available at `http://localhost:5173`
 
 ### Running Tests
 
@@ -56,12 +59,12 @@ All 27 integration tests should pass.
 
 ## Features
 
-✅ **CRUD Operations**: Create, read, update, and delete todos  
-✅ **Filtering**: Filter todos by due date and tags  
-✅ **Modern UI**: Built with React, TypeScript, and Vite  
-✅ **Type-Safe**: Full TypeScript support  
-✅ **API Documentation**: Auto-generated with FastAPI  
-✅ **Tested**: Comprehensive integration test suite  
+- ✅ **CRUD Operations**: Create, read, update, and delete todos  
+- ✅ **Filtering**: Filter todos by due date and tags  
+- ✅ **Modern UI**: Built with React, TypeScript, and Vite  
+- ✅ **Type-Safe**: Full TypeScript support  
+- ✅ **API Documentation**: Auto-generated with FastAPI  
+- ✅ **Tested**: Comprehensive integration test suite  
 
 ## Configuration
 
@@ -119,21 +122,9 @@ uv run pytest test_api.py         # Run tests
 - **Data Storage**: In-memory (easily replaceable with database)
 - **API Design**: RESTful, following OpenAPI 3.0 spec
 
-## Next Steps
-
-- [ ] Add authentication
-- [ ] Add database persistence (PostgreSQL/SQLite)
-- [ ] Add more filtering options
-- [ ] Deploy to production
-- [ ] Add user accounts and multi-user support
 
 ## Documentation
 
 - [Frontend README](client/README.md)
 - [Backend README](server/README.md)
 - [OpenAPI Specification](openapi.yaml)
-- [API Guide](.gemini/antigravity/brain/.../openapi-guide.md)
-
-## License
-
-MIT

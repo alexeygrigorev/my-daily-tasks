@@ -1,21 +1,42 @@
-"""
-Integration tests for the My Daily Tasks API.
-
-Tests all CRUD operations, filtering, and error handling.
-"""
-
 import pytest
 from datetime import datetime, timedelta
 from fastapi.testclient import TestClient
-from main import app, todos_db
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy.pool import StaticPool
+
+from main import app
+from database import Base, get_db
+
+# Setup in-memory database for testing
+SQLALCHEMY_DATABASE_URL = "sqlite:///:memory:"
+
+engine = create_engine(
+    SQLALCHEMY_DATABASE_URL,
+    connect_args={"check_same_thread": False},
+    poolclass=StaticPool,
+)
+TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 
 @pytest.fixture(autouse=True)
 def clear_db():
     """Clear the database before each test."""
-    todos_db.clear()
+    Base.metadata.create_all(bind=engine)
     yield
-    todos_db.clear()
+    Base.metadata.drop_all(bind=engine)
+
+
+def override_get_db():
+    """Override dependency to use test database."""
+    try:
+        db = TestingSessionLocal()
+        yield db
+    finally:
+        db.close()
+
+
+app.dependency_overrides[get_db] = override_get_db
 
 
 @pytest.fixture
